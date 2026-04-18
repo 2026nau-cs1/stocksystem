@@ -42,10 +42,16 @@ export const signupUserSchema = insertUserSchema
     path: ['confirmPassword'],
   });
 
+export const updateUserPreferencesSchema = z.object({
+  theme: z.enum(['dark', 'light']).optional(),
+  refreshRate: z.coerce.number().int().min(1).max(60).optional(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type LoginUserInput = z.infer<typeof loginUserSchema>;
 export type SignupUserInput = z.infer<typeof signupUserSchema>;
+export type UpdateUserPreferencesInput = z.infer<typeof updateUserPreferencesSchema>;
 
 // ============================================
 // Watchlist Groups Table

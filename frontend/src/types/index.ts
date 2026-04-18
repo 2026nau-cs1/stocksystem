@@ -56,6 +56,10 @@ export interface StockListItem {
   changePercent: string;
 }
 
+export interface StockRankItem extends StockListItem {
+  change: string;
+}
+
 export interface OrderBookEntry {
   level: string;
   price: string;

@@ -1,10 +1,19 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
+
+type AliyunApiNode = {
+  [key: string]: unknown;
+  data?: AliyunApiNode;
+  list?: AliyunApiNode[];
+};
+
+type AliyunApiResponse = {
+  data: AliyunApiNode;
+};
 
 class AliyunApiService {
   private appKey: string;
   private appSecret: string;
   private endpoint: string;
-
   private appCode: string;
 
   constructor() {
@@ -15,30 +24,34 @@ class AliyunApiService {
 
     if (!this.appCode || !this.endpoint) {
       console.warn(
-        '警告: 未设置 ALIYUN_API_APP_CODE 或 ALIYUN_API_ENDPOINT，行情相关接口将不可用（请在 .env 中配置，勿提交密钥到 Git）。'
+        'Missing ALIYUN_API_APP_CODE or ALIYUN_API_ENDPOINT; market endpoints will fall back to mock data.'
       );
     }
   }
 
-  private async request<T>(path: string, data: Record<string, string>, method: 'GET' | 'POST' = 'POST'): Promise<T> {
+  private async request(
+    path: string,
+    data: Record<string, string>,
+    method: 'GET' | 'POST' = 'POST'
+  ): Promise<AliyunApiResponse> {
     if (!this.appCode || !this.endpoint) {
       throw new Error(
-        '阿里云行情未配置：请在环境变量中设置 ALIYUN_API_APP_CODE 与 ALIYUN_API_ENDPOINT（密钥勿提交到 Git）。'
+        'Aliyun market API is not configured. Please set ALIYUN_API_APP_CODE and ALIYUN_API_ENDPOINT.'
       );
     }
+
     try {
-      // 构建表单参数
       const formData = Object.entries(data)
         .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
         .join('&');
 
-      const config: any = {
+      const config: AxiosRequestConfig<string> = {
         method,
         url: `${this.endpoint}${path}`,
         headers: {
-          'Authorization': `APPCODE ${this.appCode}`,
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-        }
+          Authorization: `APPCODE ${this.appCode}`,
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        },
       };
 
       if (method === 'GET') {
@@ -47,119 +60,124 @@ class AliyunApiService {
         config.data = formData;
       }
 
-      const response = await axios(config);
-      return { data: response.data } as T;
+      const response = await axios.request<AliyunApiNode, { data: AliyunApiNode }, string>(
+        config
+      );
+      return { data: response.data };
     } catch (error) {
-      console.error('阿里云 API 请求失败:', error);
+      console.error('Aliyun API request failed:', error);
       if (axios.isAxiosError(error)) {
         if (error.response) {
-          // 服务器返回错误状态码
           const status = error.response.status;
-          const message = error.response.data?.message || error.response.statusText || '服务器返回错误';
-          throw new Error(`API请求失败 (${status}): ${message}`);
-        } else if (error.request) {
-          // 请求已发送但没有收到响应
-          throw new Error('API请求超时或网络连接失败');
-        } else {
-          // 请求配置出错
-          throw new Error(`请求配置错误: ${error.message}`);
+          const responseData = error.response.data;
+          const message =
+            typeof responseData === 'object' &&
+            responseData !== null &&
+            'message' in responseData &&
+            typeof responseData.message === 'string'
+              ? responseData.message
+              : error.response.statusText || 'Server returned an error';
+          throw new Error(`API request failed (${status}): ${message}`);
         }
-      } else {
-        // 其他错误
-        throw new Error(`获取市场数据失败: ${error instanceof Error ? error.message : '未知错误'}`);
+
+        if (error.request) {
+          throw new Error('API request timed out or the network connection failed');
+        }
+
+        throw new Error(`Request configuration error: ${error.message}`);
       }
+
+      throw new Error(
+        `Failed to fetch market data: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
-  // 获取市场指数
-  async getIndices(): Promise<{ data: any }> {
-    return this.request<{ data: any }>('/stock/a/rank', {
+  async getIndices(): Promise<AliyunApiResponse> {
+    return this.request('/stock/a/rank', {
       market: 'hs_a',
       sort: 'changeRate',
       asc: '0',
       pageNo: '1',
-      pageSize: '10'
+      pageSize: '10',
     });
   }
 
-  // 获取股票行情
-  async getStockQuote(code: string): Promise<{ data: any }> {
-    return this.request<{ data: any }>('/stock/a/price', {
-      symbol: code
+  async getStockQuote(code: string): Promise<AliyunApiResponse> {
+    return this.request('/stock/a/price', {
+      symbol: code,
     });
   }
 
-  // 获取股票列表
-  async getStocks(): Promise<{ data: any }> {
-    return this.request<{ data: any }>('/stock/a/rank', {
+  async getStocks(): Promise<AliyunApiResponse> {
+    return this.request('/stock/a/rank', {
       market: 'hs_a',
       sort: 'changeRate',
       asc: '0',
       pageNo: '1',
-      pageSize: '100'
+      pageSize: '100',
     });
   }
 
-  // 获取行业板块
-  async getSectors(): Promise<{ data: any }> {
-    return this.request<{ data: any }>('/stock/a/rank', {
+  async getSectors(): Promise<AliyunApiResponse> {
+    return this.request('/stock/a/rank', {
       market: 'hs_a',
       sort: 'changeRate',
       asc: '0',
       pageNo: '1',
-      pageSize: '10'
+      pageSize: '10',
     });
   }
 
-  // 获取财经新闻
-  async getNews(category?: string): Promise<{ data: any }> {
-    return this.request<{ data: any }>('/stock/a/rank', {
+  async getNews(_category?: string): Promise<AliyunApiResponse> {
+    return this.request('/stock/a/rank', {
       market: 'hs_a',
       sort: 'changeRate',
       asc: '0',
       pageNo: '1',
-      pageSize: '10'
+      pageSize: '10',
     });
   }
 
-  // 获取股票基本面
-  async getFundamentals(code: string): Promise<{ data: any }> {
-    return this.request<{ data: any }>('/stock/a/rank', {
+  async getFundamentals(_code: string): Promise<AliyunApiResponse> {
+    return this.request('/stock/a/rank', {
       market: 'hs_a',
       sort: 'changeRate',
       asc: '0',
       pageNo: '1',
-      pageSize: '10'
+      pageSize: '10',
     });
   }
 
-  // 获取 K 线数据
-  async getKline(code: string, period: string = '1d', limit: string = '60'): Promise<{ data: any }> {
+  async getKline(
+    code: string,
+    period: string = '1d',
+    limit: string = '60'
+  ): Promise<AliyunApiResponse> {
     const typeMap: Record<string, string> = {
-      '1d': '240',    // 日K
-      '5d': '240',    // 日K
-      '1m': '1',      // 1分钟
-      '5m': '5',      // 5分钟
-      '15m': '15',    // 15分钟
-      '30m': '30',    // 30分钟
-      '60m': '60'     // 60分钟
+      '1d': '240',
+      '5d': '240',
+      '1m': '1',
+      '5m': '5',
+      '15m': '15',
+      '30m': '30',
+      '60m': '60',
     };
-    
-    return this.request<{ data: any }>('/stock/a/kline', {
+
+    return this.request('/stock/a/kline', {
       symbol: code,
       type: typeMap[period] || '240',
-      pageSize: limit
+      pageSize: limit,
     });
   }
 
-  // 获取A股排行
-  async getStockRank(): Promise<{ data: any }> {
-    return this.request<{ data: any }>('/stock/a/rank', {
+  async getStockRank(): Promise<AliyunApiResponse> {
+    return this.request('/stock/a/rank', {
       sort: 'changeRate',
       market: 'hs_a',
       asc: '0',
       pageNo: '1',
-      pageSize: '5'
+      pageSize: '10',
     });
   }
 }

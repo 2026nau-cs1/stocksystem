@@ -1,38 +1,24 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { API_BASE_URL } from '@/config/constants';
-
-interface AuthContextType {
-  isAuthenticated: boolean | null;
-  setIsAuthenticated: (value: boolean) => void;
-  login: (token: string) => void;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { AuthContext } from './auth-context';
+import { applyTheme, getStoredTheme } from '@/lib/theme';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  // Initialize state directly from localStorage during render (lazy initialization)
-  // This avoids synchronous setState in useEffect which causes cascading renders
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(() => {
     const token = localStorage.getItem('token');
-    // If no token, we know user is not authenticated
-    // If token exists, return null (checking state) to verify with backend
     return token ? null : false;
   });
 
   useEffect(() => {
+    applyTheme(getStoredTheme());
+
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
+
       if (!token) {
-        // Already handled in initial state
         return;
       }
+
       try {
         const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: {
@@ -40,16 +26,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           },
         });
         const data = await response.json();
+
         setIsAuthenticated(data.success);
+
         if (!data.success) {
           localStorage.removeItem('token');
+          return;
         }
-      } catch (error) {
+
+        if (data.data?.theme === 'light' || data.data?.theme === 'dark') {
+          applyTheme(data.data.theme);
+        }
+      } catch {
         setIsAuthenticated(false);
         localStorage.removeItem('token');
       }
     };
-    checkAuth();
+
+    void checkAuth();
   }, []);
 
   const login = (token: string) => {
@@ -63,16 +57,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider
-      value={{ isAuthenticated, setIsAuthenticated, login, logout }}
-    >
+    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
 };

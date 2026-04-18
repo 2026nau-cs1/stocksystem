@@ -6,6 +6,7 @@ import { Resend } from 'resend';
 import { SES, SendEmailCommand } from '@aws-sdk/client-ses';
 
 type EmailProvider = 'SMTP' | 'SENDGRID' | 'MAILGUN' | 'RESEND' | 'AWS_SES';
+type MailgunClient = ReturnType<Mailgun['client']>;
 
 export interface SendMailInput {
   to: string | string[];
@@ -33,8 +34,8 @@ function getFromAddress(explicitFrom?: string): string {
 
 // Lazily initialized clients
 let smtpTransporter: nodemailer.Transporter | null = null;
-let mailgunClient: any | null = null;
-let resendClient: any | null = null;
+let mailgunClient: MailgunClient | null = null;
+let resendClient: Resend | null = null;
 let sesClient: SES | null = null;
 
 async function initSmtp() {
@@ -148,7 +149,13 @@ export async function sendEmail({
           html,
           text,
         });
-        return { success: true, id: (result as any).id };
+        return {
+          success: true,
+          id:
+            typeof result === 'object' && result !== null && 'id' in result
+              ? String(result.id)
+              : undefined,
+        };
       }
       case 'AWS_SES': {
         const ses = initSes();
@@ -169,8 +176,11 @@ export async function sendEmail({
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('sendMail failed:', error);
-    return { success: false, error: error?.message || 'sendMail failed' };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'sendMail failed',
+    };
   }
 }

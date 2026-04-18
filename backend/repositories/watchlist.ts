@@ -6,6 +6,7 @@ import {
 } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
+import { toDrizzleInsert } from './helpers';
 
 type CreateGroupInput = z.infer<typeof insertWatchlistGroupSchema>;
 type CreateItemInput = z.infer<typeof insertWatchlistItemSchema>;
@@ -16,7 +17,10 @@ export class WatchlistRepository {
   }
 
   async createGroup(data: CreateGroupInput) {
-    const [group] = await db.insert(watchlistGroups).values(data as InsertWatchlistGroup).returning();
+    const [group] = await db
+      .insert(watchlistGroups)
+      .values(toDrizzleInsert<InsertWatchlistGroup>(data))
+      .returning();
     return group;
   }
 
@@ -37,7 +41,10 @@ export class WatchlistRepository {
   }
 
   async addItem(data: CreateItemInput) {
-    const [item] = await db.insert(watchlistItems).values(data as InsertWatchlistItem).returning();
+    const [item] = await db
+      .insert(watchlistItems)
+      .values(toDrizzleInsert<InsertWatchlistItem>(data))
+      .returning();
     return item;
   }
 

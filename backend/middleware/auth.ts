@@ -25,13 +25,23 @@ import passport from 'passport';
 import { AUTH_ERRORS } from '../config/constants';
 import { AppError } from './errorHandler';
 
+export interface AuthenticatedUser {
+  id: string;
+  name: string;
+  email: string;
+  role?: string;
+  theme?: string;
+  refreshRate?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface AuthInfo {
+  message?: string;
+}
+
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-  };
+  user?: AuthenticatedUser;
 }
 
 // Middleware for routes that require authentication
@@ -43,7 +53,7 @@ export function authenticateJWT(
   passport.authenticate(
     'jwt',
     { session: false },
-    (err: any, user: any, info: any) => {
+    (err: Error | null, user: AuthenticatedUser | false, _info: AuthInfo) => {
       if (err) {
         return next(err);
       }
@@ -68,7 +78,7 @@ export function authenticateLocal(
   passport.authenticate(
     'local',
     { session: false },
-    (err: any, user: any, info: any) => {
+    (err: Error | null, user: AuthenticatedUser | false, info: AuthInfo) => {
       if (err) {
         return next(err);
       }

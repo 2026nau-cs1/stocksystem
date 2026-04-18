@@ -2,6 +2,7 @@ import { db } from '../db';
 import { uploads, InsertUpload, insertUploadSchema } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { toDrizzleInsert, withUpdatedAt } from './helpers';
 
 // Use Zod-inferred type for repository inputs to align with route validation.
 type CreateUploadInput = z.infer<typeof insertUploadSchema>;
@@ -10,8 +11,7 @@ export class UploadRepository {
   async create(uploadData: CreateUploadInput) {
     const [upload] = await db
       .insert(uploads)
-      // Drizzle expects InsertUpload; assert at the DB boundary after validation.
-      .values(uploadData as InsertUpload)
+      .values(toDrizzleInsert<InsertUpload>(uploadData))
       .returning();
 
     return upload;
@@ -26,7 +26,7 @@ export class UploadRepository {
   async updateStatus(id: string, status: string) {
     const [upload] = await db
       .update(uploads)
-      .set({ status, updatedAt: new Date() })
+      .set(withUpdatedAt({ status }))
       .where(eq(uploads.id, id))
       .returning();
 

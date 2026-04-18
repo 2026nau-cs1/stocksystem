@@ -12,9 +12,18 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+const dbSslMode = (process.env.DB_SSL || 'require').toLowerCase();
+const ssl =
+  dbSslMode === 'disable'
+    ? false
+    : {
+        // Supabase requires SSL; local dev can disable with DB_SSL=disable.
+        rejectUnauthorized: false,
+      };
+
 // Database connection with connection pooling
 const client = postgres(process.env.DATABASE_URL, {
-  ssl: false, // 本地数据库不需要 SSL
+  ssl,
   max: 10, // Set pool size
   idle_timeout: 20, // Idle connection timeout in seconds
   connect_timeout: 10, // Connection timeout in seconds

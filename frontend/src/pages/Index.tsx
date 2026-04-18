@@ -1,5 +1,15 @@
-import { useState } from 'react';
-import { TrendingUp, Star, PieChart, Bell, Newspaper, User, Menu, X, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Bell,
+  Menu,
+  Newspaper,
+  PieChart,
+  Search,
+  Star,
+  TrendingUp,
+  User,
+  X,
+} from 'lucide-react';
 import { Toaster } from '@/components/ui/sonner';
 import OmniflowBadge from '@/components/custom/OmniflowBadge';
 import MarketView from '@/components/custom/MarketView';
@@ -8,7 +18,8 @@ import PortfolioView from '@/components/custom/PortfolioView';
 import AlertsView from '@/components/custom/AlertsView';
 import NewsView from '@/components/custom/NewsView';
 import ProfileView from '@/components/custom/ProfileView';
-import type { ViewType } from '@/types';
+import { marketApi } from '@/lib/api';
+import type { StockListItem, ViewType } from '@/types';
 
 const NAV_ITEMS: { key: ViewType; label: string; icon: React.ElementType }[] = [
   { key: 'market', label: '行情', icon: TrendingUp },
@@ -19,58 +30,189 @@ const NAV_ITEMS: { key: ViewType; label: string; icon: React.ElementType }[] = [
   { key: 'profile', label: '我的', icon: User },
 ];
 
+type SearchBoxProps = {
+  value: string;
+  results: StockListItem[];
+  loading: boolean;
+  open: boolean;
+  onChange: (value: string) => void;
+  onFocus: () => void;
+  onSelect: (item: StockListItem) => void;
+  placeholder?: string;
+  className?: string;
+};
+
+function SearchBox({
+  value,
+  results,
+  loading,
+  open,
+  onChange,
+  onFocus,
+  onSelect,
+  placeholder = '搜索代码或股票名称',
+  className = '',
+}: SearchBoxProps) {
+  return (
+    <div className={`relative ${className}`}>
+      <div className="flex items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] px-3 py-1.5">
+        <Search className="h-4 w-4 text-[var(--app-muted)]" />
+        <input
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onFocus={onFocus}
+          placeholder={placeholder}
+          className="w-full bg-transparent font-mono text-sm text-[var(--app-text)] outline-none placeholder:text-[var(--app-muted)]"
+        />
+      </div>
+
+      {open ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-lg">
+          {loading ? (
+            <div className="px-3 py-3 text-xs font-mono text-[var(--app-muted)]">搜索中...</div>
+          ) : results.length > 0 ? (
+            results.map((item) => (
+              <button
+                key={item.code}
+                onClick={() => onSelect(item)}
+                className="flex w-full items-center justify-between border-b border-[var(--app-border)] px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-[var(--app-soft)]"
+              >
+                <div>
+                  <div className="font-mono text-sm text-[var(--app-text)]">{item.name}</div>
+                  <div className="mt-1 font-mono text-xs text-[var(--app-muted)]">
+                    {item.code} · {item.symbol}
+                  </div>
+                </div>
+                <div className="font-mono text-xs text-[var(--app-muted)]">{item.price}</div>
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-3 text-xs font-mono text-[var(--app-muted)]">没有找到匹配的股票</div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Index() {
   const [currentView, setCurrentView] = useState<ViewType>('market');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<StockListItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedStock, setSelectedStock] = useState('600519');
+  const shellRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const response = await marketApi.searchStocks(trimmedQuery);
+        if (response.success) {
+          setSearchResults(response.data);
+        } else {
+          setSearchResults([]);
+        }
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!shellRef.current?.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => window.removeEventListener('mousedown', handlePointerDown);
+  }, []);
 
   const handleNavClick = (view: ViewType) => {
     setCurrentView(view);
     setMobileMenuOpen(false);
   };
 
+  const handleSelectStock = (item: StockListItem) => {
+    setSelectedStock(item.code);
+    setCurrentView('market');
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchOpen(false);
+    setMobileMenuOpen(false);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setSearchOpen(value.trim().length > 0);
+  };
+
   const renderView = () => {
     switch (currentView) {
-      case 'market': return <MarketView />;
-      case 'watchlist': return <WatchlistView />;
-      case 'portfolio': return <PortfolioView />;
-      case 'alerts': return <AlertsView />;
-      case 'news': return <NewsView />;
-      case 'profile': return <ProfileView />;
-      default: return <MarketView />;
+      case 'market':
+        return <MarketView selectedStock={selectedStock} onSelectStock={setSelectedStock} />;
+      case 'watchlist':
+        return <WatchlistView />;
+      case 'portfolio':
+        return <PortfolioView />;
+      case 'alerts':
+        return <AlertsView />;
+      case 'news':
+        return <NewsView />;
+      case 'profile':
+        return <ProfileView />;
+      default:
+        return <MarketView selectedStock={selectedStock} onSelectStock={setSelectedStock} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#080C10] text-[#E8F0F8]">
-      {/* Top Navigation */}
-      <nav className="border-b border-[#1A2A3A] bg-[#0F1620]/90 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-screen-xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-14">
-            {/* Logo */}
+    <div ref={shellRef} className="min-h-screen bg-[var(--app-bg)] pb-16 text-[var(--app-text)] md:pb-0">
+      <nav className="sticky top-0 z-50 border-b border-[var(--app-border)] bg-[rgb(var(--app-surface-rgb)/0.9)] backdrop-blur-md">
+        <div className="mx-auto max-w-screen-xl px-4 sm:px-6">
+          <div className="flex h-14 items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-md bg-[#00FF88] flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-[#080C10]" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#16A34A]">
+                  <TrendingUp className="h-4 w-4 text-white" />
                 </div>
-                <span className="font-bold text-lg tracking-tight text-[#E8F0F8] font-mono">StockPulse</span>
+                <span className="font-mono text-lg font-bold tracking-tight text-[var(--app-text)]">
+                  StockPulse
+                </span>
               </div>
 
-              {/* Desktop Nav */}
-              <div className="hidden md:flex items-center gap-1 ml-6">
-                {NAV_ITEMS.map(item => {
+              <div className="ml-6 hidden items-center gap-1 md:flex">
+                {NAV_ITEMS.map((item) => {
                   const Icon = item.icon;
+
                   return (
                     <button
                       key={item.key}
                       onClick={() => handleNavClick(item.key)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md font-mono transition-all duration-200 ${
+                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-sm transition-all duration-200 ${
                         currentView === item.key
-                          ? 'text-[#00FF88] bg-[#00FF88]/10'
-                          : 'text-[#5A7A9A] hover:text-[#E8F0F8]'
+                          ? 'bg-[#16A34A]/10 text-[#15803D]'
+                          : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
                       }`}
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon className="h-3.5 w-3.5" />
                       {item.label}
                     </button>
                   );
@@ -78,131 +220,127 @@ export default function Index() {
               </div>
             </div>
 
-            {/* Right Side */}
             <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="hidden sm:flex items-center gap-2 bg-[#080C10] border border-[#1A2A3A] rounded-lg px-3 py-1.5">
-                <Search className="w-4 h-4 text-[#5A7A9A]" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="搜索股票代码/名称"
-                  className="bg-transparent text-sm text-[#E8F0F8] placeholder-[#5A7A9A] outline-none w-36 font-mono"
-                />
-              </div>
+              <SearchBox
+                value={searchQuery}
+                results={searchResults}
+                loading={searchLoading}
+                open={searchOpen}
+                onChange={handleSearchChange}
+                onFocus={() => setSearchOpen(searchQuery.trim().length > 0)}
+                onSelect={handleSelectStock}
+                className="hidden w-64 sm:block"
+              />
 
-              {/* Notification Bell */}
               <button
                 onClick={() => handleNavClick('alerts')}
-                className="relative w-8 h-8 rounded-full bg-[#1A2A3A] flex items-center justify-center hover:bg-[#00FF88]/20 transition-colors"
+                className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--app-soft)] transition-colors hover:bg-[#16A34A]/10"
+                title="查看预警"
               >
-                <Bell className="w-4 h-4 text-[#5A7A9A]" />
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#FF4560] rounded-full" />
+                <Bell className="h-4 w-4 text-[var(--app-muted)]" />
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#E11D48]" />
               </button>
 
-              {/* Profile Avatar */}
               <button
                 onClick={() => handleNavClick('profile')}
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00FF88] to-[#0EA5E9] flex items-center justify-center text-xs font-bold text-[#080C10]"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#16A34A] to-[#0EA5E9] text-xs font-bold text-white"
+                title="个人中心"
               >
-                <User className="w-4 h-4" />
+                <User className="h-4 w-4" />
               </button>
 
-              {/* Mobile Menu Toggle */}
               <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden w-8 h-8 rounded-lg bg-[#1A2A3A] flex items-center justify-center text-[#5A7A9A] hover:text-[#E8F0F8] transition-colors"
+                onClick={() => setMobileMenuOpen((current) => !current)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--app-soft)] text-[var(--app-muted)] transition-colors hover:text-[var(--app-text)] md:hidden"
+                title={mobileMenuOpen ? '关闭菜单' : '打开菜单'}
               >
-                {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#1A2A3A] bg-[#0F1620]">
-            <div className="px-4 py-3 space-y-1">
-              {/* Mobile Search */}
-              <div className="flex items-center gap-2 bg-[#080C10] border border-[#1A2A3A] rounded-lg px-3 py-2 mb-3">
-                <Search className="w-4 h-4 text-[#5A7A9A]" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="搜索股票代码/名称"
-                  className="bg-transparent text-sm text-[#E8F0F8] placeholder-[#5A7A9A] outline-none flex-1 font-mono"
-                />
-              </div>
-              {NAV_ITEMS.map(item => {
+        {mobileMenuOpen ? (
+          <div className="border-t border-[var(--app-border)] bg-[var(--app-surface)] md:hidden">
+            <div className="space-y-1 px-4 py-3">
+              <SearchBox
+                value={searchQuery}
+                results={searchResults}
+                loading={searchLoading}
+                open={searchOpen}
+                onChange={handleSearchChange}
+                onFocus={() => setSearchOpen(searchQuery.trim().length > 0)}
+                onSelect={handleSelectStock}
+                className="mb-3"
+              />
+
+              {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
+
                 return (
                   <button
                     key={item.key}
                     onClick={() => handleNavClick(item.key)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-mono transition-all duration-200 ${
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 font-mono text-sm transition-all duration-200 ${
                       currentView === item.key
-                        ? 'text-[#00FF88] bg-[#00FF88]/10'
-                        : 'text-[#5A7A9A] hover:text-[#E8F0F8] hover:bg-[#080C10]'
+                        ? 'bg-[#16A34A]/10 text-[#15803D]'
+                        : 'text-[var(--app-muted)] hover:bg-[var(--app-soft-hover)] hover:text-[var(--app-text)]'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="h-4 w-4" />
                     {item.label}
                   </button>
                 );
               })}
             </div>
           </div>
-        )}
+        ) : null}
       </nav>
 
-      {/* Main Content */}
-      <main className="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
-        {renderView()}
-      </main>
+      <main className="mx-auto max-w-screen-xl px-4 py-6 sm:px-6">{renderView()}</main>
 
-      {/* Footer */}
-      <footer className="border-t border-[#1A2A3A] bg-[#0F1620] mt-8">
-        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-5">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+      <footer className="mt-8 border-t border-[var(--app-border)] bg-[var(--app-surface)]">
+        <div className="mx-auto max-w-screen-xl px-4 py-5 sm:px-6">
+          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-[#00FF88] flex items-center justify-center">
-                <TrendingUp className="w-3.5 h-3.5 text-[#080C10]" />
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-[#16A34A]">
+                <TrendingUp className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-sm font-semibold text-[#E8F0F8] font-mono">StockPulse</span>
-              <span className="text-xs text-[#5A7A9A] font-mono">v1.0 MVP</span>
+              <span className="font-mono text-sm font-semibold text-[var(--app-text)]">StockPulse</span>
+              <span className="font-mono text-xs text-[var(--app-muted)]">版本 1.0</span>
             </div>
+
             <div className="flex items-center gap-4">
-              <span className="text-xs text-[#5A7A9A] font-mono">行情延迟 ≤ 2s</span>
-              <span className="text-xs text-[#5A7A9A] font-mono">系统可用性 99.9%</span>
+              <span className="font-mono text-xs text-[var(--app-muted)]">行情延迟 ≤ 2s</span>
+              <span className="font-mono text-xs text-[var(--app-muted)]">系统可用率 99.9%</span>
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#00FF88] animate-pulse" />
-                <span className="text-xs font-mono text-[#00FF88]">系统正常</span>
+                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#16A34A]" />
+                <span className="font-mono text-xs text-[#15803D]">系统正常</span>
               </div>
             </div>
-            <p className="text-xs text-[#5A7A9A] font-mono">© 2026 StockPulse · 行情数据仅供参考，不构成投资建议</p>
+
+            <p className="font-mono text-xs text-[var(--app-muted)]">
+              © 2026 StockPulse · 行情数据仅供参考，不构成投资建议
+            </p>
           </div>
         </div>
       </footer>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F1620] border-t border-[#1A2A3A] z-40">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--app-border)] bg-[var(--app-surface)] md:hidden">
         <div className="flex items-center justify-around px-2 py-2">
-          {NAV_ITEMS.map(item => {
+          {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
+
             return (
               <button
                 key={item.key}
                 onClick={() => handleNavClick(item.key)}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-200 ${
-                  currentView === item.key
-                    ? 'text-[#00FF88]'
-                    : 'text-[#5A7A9A]'
+                className={`flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 transition-all duration-200 ${
+                  currentView === item.key ? 'text-[#15803D]' : 'text-[var(--app-muted)]'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-[10px] font-mono">{item.label}</span>
+                <Icon className="h-5 w-5" />
+                <span className="font-mono text-[10px]">{item.label}</span>
               </button>
             );
           })}

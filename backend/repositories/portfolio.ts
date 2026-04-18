@@ -7,6 +7,7 @@ import {
 } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
+import { toDrizzleInsert, withUpdatedAt } from './helpers';
 
 type CreateHoldingInput = z.infer<typeof insertPortfolioHoldingSchema>;
 type UpdateHoldingInput = z.infer<typeof updatePortfolioHoldingSchema>;
@@ -17,13 +18,16 @@ export class PortfolioRepository {
   }
 
   async create(data: CreateHoldingInput) {
-    const [holding] = await db.insert(portfolioHoldings).values(data as InsertPortfolioHolding).returning();
+    const [holding] = await db
+      .insert(portfolioHoldings)
+      .values(toDrizzleInsert<InsertPortfolioHolding>(data))
+      .returning();
     return holding;
   }
 
   async update(id: string, userId: string, data: UpdateHoldingInput) {
     const [holding] = await db.update(portfolioHoldings)
-      .set({ ...data as Partial<InsertPortfolioHolding>, updatedAt: new Date() })
+      .set(withUpdatedAt(toDrizzleInsert<Partial<InsertPortfolioHolding>>(data)))
       .where(and(eq(portfolioHoldings.id, id), eq(portfolioHoldings.userId, userId)))
       .returning();
     return holding;

@@ -15,6 +15,7 @@ node_modules/
 # Build output
 frontend/dist/
 **/dist/
+backend-java/target/
 
 # Logs and OS
 *.log
@@ -30,6 +31,9 @@ Thumbs.db
 
 # Local scratch / personal test scripts with credentials
 test-login.local.js
+
+# Local Java tooling
+backend-java/.tools/
 
 # Vite
 frontend/.vite/

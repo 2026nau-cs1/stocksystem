@@ -1,0 +1,32 @@
+server:
+  port: ${PORT:3000}
+
+spring:
+  config:
+    import:
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+  jpa:
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        globally_quoted_identifiers: true
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+      connection-timeout: 10000
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:stockpulse-fallback-secret-2026}
+    expires-in-seconds: 604800

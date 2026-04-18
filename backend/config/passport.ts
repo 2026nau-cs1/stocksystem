@@ -7,6 +7,12 @@ import { JWT_CONFIG } from './constants';
 
 const userRepo = new UserRepository();
 
+function omitPassword<T extends { password: string }>(user: T): Omit<T, 'password'> {
+  return Object.fromEntries(
+    Object.entries(user).filter(([key]) => key !== 'password')
+  ) as Omit<T, 'password'>;
+}
+
 // Configure local strategy for username/password authentication
 passport.use(
   new LocalStrategy(
@@ -31,7 +37,7 @@ passport.use(
         }
         
         // Return the user without the password
-        const { password: _, ...userWithoutPassword } = user;
+        const userWithoutPassword = omitPassword(user);
         return done(null, userWithoutPassword);
       } catch (error) {
         return done(error);
@@ -59,7 +65,7 @@ passport.use(
         }
         
         // Return the user without the password
-        const { password: _, ...userWithoutPassword } = user;
+        const userWithoutPassword = omitPassword(user);
         return done(null, userWithoutPassword);
       } catch (error) {
         return done(error, false);

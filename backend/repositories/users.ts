@@ -1,8 +1,14 @@
 import { db } from '../db';
-import { users, InsertUser, insertUserSchema } from '../db/schema';
+import {
+  users,
+  InsertUser,
+  insertUserSchema,
+  UpdateUserPreferencesInput,
+} from '../db/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { toDrizzleInsert, withUpdatedAt } from './helpers';
 
 // Use Zod-inferred type for repository inputs so routes can pass
 // `insertUserSchema.parse(...)` directly without type mismatches.
@@ -15,11 +21,12 @@ export class UserRepository {
 
     const [user] = await db
       .insert(users)
-      // Drizzle expects InsertUser; we trust Zod validation and assert here.
-      .values({
-        ...userData,
-        password: hashedPassword,
-      } as InsertUser)
+      .values(
+        toDrizzleInsert<InsertUser>({
+          ...userData,
+          password: hashedPassword,
+        })
+      )
       .returning();
 
     return user;
@@ -27,6 +34,22 @@ export class UserRepository {
 
   async findByEmail(email: string) {
     const [user] = await db.select().from(users).where(eq(users.email, email));
+
+    return user;
+  }
+
+  async findById(id: string) {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+
+    return user;
+  }
+
+  async updatePreferences(id: string, preferences: UpdateUserPreferencesInput) {
+    const [user] = await db
+      .update(users)
+      .set(withUpdatedAt(preferences))
+      .where(eq(users.id, id))
+      .returning();
 
     return user;
   }

@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/config/constants';
 import type {
-  ApiResponse, MarketIndex, StockQuote, StockListItem, Sector, NewsItem,
+  ApiResponse, MarketIndex, StockQuote, StockListItem, StockRankItem, Sector, NewsItem,
   Fundamentals, KLinePoint, WatchlistGroup, WatchlistItem, PortfolioHolding,
   Alert, AlertHistoryItem, User,
 } from '@/types';
@@ -28,11 +28,12 @@ export const marketApi = {
   getIndices: () => apiFetch<MarketIndex[]>('/api/market/indices'),
   getQuote: (code: string) => apiFetch<StockQuote>(`/api/market/quote/${code}`),
   getStocks: () => apiFetch<StockListItem[]>('/api/market/stocks'),
+  searchStocks: (query: string) => apiFetch<StockListItem[]>(`/api/market/search?q=${encodeURIComponent(query)}`),
   getSectors: () => apiFetch<Sector[]>('/api/market/sectors'),
   getNews: (category?: string) => apiFetch<NewsItem[]>(`/api/market/news${category ? `?category=${category}` : ''}`),
   getFundamentals: (code: string) => apiFetch<Fundamentals>(`/api/market/fundamentals/${code}`),
   getKLine: (code: string) => apiFetch<KLinePoint[]>(`/api/market/kline/${code}`),
-  getStockRank: () => apiFetch<any[]>('/api/market/stock-rank'),
+  getStockRank: () => apiFetch<StockRankItem[]>('/api/market/stock-rank'),
 };
 
 // ============================================
@@ -97,4 +98,9 @@ export const feedbackApi = {
 // ============================================
 export const authApi = {
   me: () => apiFetch<User>('/api/auth/me'),
+  updatePreferences: (data: Partial<Pick<User, 'theme' | 'refreshRate'>>) =>
+    apiFetch<User>('/api/auth/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 };

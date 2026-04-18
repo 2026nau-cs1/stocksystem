@@ -6,6 +6,7 @@ import {
 } from '../db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { z } from 'zod';
+import { toDrizzleInsert, withUpdatedAt } from './helpers';
 
 type CreateAlertInput = z.infer<typeof insertAlertSchema>;
 type UpdateAlertInput = z.infer<typeof updateAlertSchema>;
@@ -17,13 +18,13 @@ export class AlertRepository {
   }
 
   async create(data: CreateAlertInput) {
-    const [alert] = await db.insert(alerts).values(data as InsertAlert).returning();
+    const [alert] = await db.insert(alerts).values(toDrizzleInsert<InsertAlert>(data)).returning();
     return alert;
   }
 
   async update(id: string, userId: string, data: UpdateAlertInput) {
     const [alert] = await db.update(alerts)
-      .set({ ...data as Partial<InsertAlert>, updatedAt: new Date() })
+      .set(withUpdatedAt(toDrizzleInsert<Partial<InsertAlert>>(data)))
       .where(and(eq(alerts.id, id), eq(alerts.userId, userId)))
       .returning();
     return alert;
@@ -44,7 +45,10 @@ export class AlertRepository {
   }
 
   async addHistory(data: CreateHistoryInput) {
-    const [history] = await db.insert(alertHistory).values(data as InsertAlertHistory).returning();
+    const [history] = await db
+      .insert(alertHistory)
+      .values(toDrizzleInsert<InsertAlertHistory>(data))
+      .returning();
     return history;
   }
 }

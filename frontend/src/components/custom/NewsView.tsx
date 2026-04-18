@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
-import { marketApi } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { Newspaper } from 'lucide-react';
+import { EmptyState, LoadingState } from '@/components/custom/async-state';
 
-const AI_ANALYSIS_TABS = [
+const ANALYSIS_TABS = [
   { key: 'market', label: '市场分析' },
   { key: 'sector', label: '板块分析' },
   { key: 'stock', label: '个股分析' },
   { key: 'trend', label: '趋势预测' },
-];
+] as const;
 
 const HOT_SECTORS = [
   { name: '半导体', change: '+5.23%', trend: 'up' },
@@ -14,93 +15,87 @@ const HOT_SECTORS = [
   { name: '人工智能', change: '+4.56%', trend: 'up' },
   { name: '医药', change: '-1.23%', trend: 'down' },
   { name: '金融', change: '+0.89%', trend: 'up' },
-];
+] as const;
 
 const RECOMMENDATIONS = [
   {
     title: '市场分析',
-    content: '当前市场处于震荡上行阶段，成交量温和放大，技术指标显示市场情绪向好。建议关注业绩超预期的优质个股。'
+    content:
+      '当前市场处于震荡偏强阶段，成交量温和放大，优先关注业绩兑现能力更强、趋势更稳的龙头标的。',
   },
   {
     title: '板块轮动',
-    content: '半导体和人工智能板块表现强势，建议关注相关产业链龙头企业。新能源板块有企稳迹象，可逢低布局。'
+    content:
+      '半导体与人工智能保持活跃，新能源开始出现企稳信号，可以分批观察强势板块中的核心公司。',
   },
   {
     title: '风险提示',
-    content: '近期市场波动较大，建议控制仓位，避免追高。关注外部市场环境变化和政策面消息。'
+    content:
+      '短线波动仍然偏大，避免追高，重点留意外部市场情绪和政策变化带来的回撤风险。',
   },
   {
-    title: '投资策略',
-    content: '建议采取均衡配置策略，适当增加科技板块比重，同时关注防御性板块的机会。'
+    title: '配置建议',
+    content:
+      '更适合采用均衡配置思路，用成长板块搭配防御资产，控制仓位节奏比追逐热点更重要。',
   },
-];
+] as const;
+
+type AnalysisTabKey = (typeof ANALYSIS_TABS)[number]['key'];
+
+function getSentimentText(score: number) {
+  if (score < 40) return '市场情绪：偏悲观';
+  if (score < 50) return '市场情绪：谨慎';
+  if (score < 60) return '市场情绪：中性';
+  if (score < 70) return '市场情绪：偏乐观';
+  return '市场情绪：积极';
+}
+
+function getSentimentColor(score: number) {
+  if (score < 40) return 'bg-red-500';
+  if (score < 50) return 'bg-orange-500';
+  if (score < 60) return 'bg-amber-500';
+  if (score < 70) return 'bg-green-500';
+  return 'bg-[#16A34A]';
+}
 
 export default function NewsView() {
-  const [activeTab, setActiveTab] = useState('market');
-  const [marketSentiment, setMarketSentiment] = useState('neutral');
+  const [activeTab, setActiveTab] = useState<AnalysisTabKey>('market');
   const [sentimentScore, setSentimentScore] = useState(55);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 模拟AI分析数据加载
-    const loadAnalysis = async () => {
-      setLoading(true);
-      // 模拟网络请求延迟
-      setTimeout(() => {
-        // 随机生成市场情绪
-        const sentiments = ['bearish', 'neutral', 'bullish'];
-        const randomSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
-        setMarketSentiment(randomSentiment);
-        
-        // 根据情绪生成分数
-        let score;
-        if (randomSentiment === 'bearish') {
-          score = Math.floor(Math.random() * 40) + 10;
-        } else if (randomSentiment === 'neutral') {
-          score = Math.floor(Math.random() * 20) + 45;
-        } else {
-          score = Math.floor(Math.random() * 40) + 60;
-        }
-        setSentimentScore(score);
-        setLoading(false);
-      }, 1000);
-    };
+    const timer = window.setTimeout(() => {
+      const phase = new Date().getSeconds();
+      const score = 48 + (phase % 24);
+      setSentimentScore(score);
+      setLoading(false);
+    }, 800);
 
-    loadAnalysis();
-  }, []);
+    return () => window.clearTimeout(timer);
+  }, [activeTab]);
 
-  const getSentimentText = () => {
-    if (sentimentScore < 40) return '市场情绪：极度悲观';
-    if (sentimentScore < 50) return '市场情绪：悲观';
-    if (sentimentScore < 60) return '市场情绪：中性';
-    if (sentimentScore < 70) return '市场情绪：乐观';
-    return '市场情绪：极度乐观';
-  };
-
-  const getSentimentColor = () => {
-    if (sentimentScore < 40) return 'bg-[#FF4560]';
-    if (sentimentScore < 50) return 'bg-[#FF9800]';
-    if (sentimentScore < 60) return 'bg-[#F59E0B]';
-    if (sentimentScore < 70) return 'bg-[#4CAF50]';
-    return 'bg-[#00FF88]';
-  };
+  const sentimentLabel = getSentimentText(sentimentScore);
+  const sentimentColor = getSentimentColor(sentimentScore);
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-[#E8F0F8] flex items-center gap-2">
-        AI市场分析
+      <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--app-text)]">
+        <Newspaper className="h-5 w-5 text-[#16A34A]" />
+        AI 市场分析
       </h2>
 
-      {/* AI Analysis Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-        {AI_ANALYSIS_TABS.map(tab => (
+      <div className="scrollbar-hide flex items-center gap-2 overflow-x-auto pb-1">
+        {ANALYSIS_TABS.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-3 py-1.5 text-xs font-mono rounded-lg whitespace-nowrap transition-all duration-200 ${
+            onClick={() => {
+              setLoading(true);
+              setActiveTab(tab.key);
+            }}
+            className={`whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-mono transition-colors ${
               activeTab === tab.key
-                ? 'bg-[#00FF88]/10 text-[#00FF88] border border-[#00FF88]/30'
-                : 'bg-[#0F1620] text-[#5A7A9A] border border-[#1A2A3A] hover:text-[#E8F0F8]'
+                ? 'border-[#16A34A]/30 bg-[#16A34A]/10 text-[#16A34A]'
+                : 'border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-muted)] hover:text-[var(--app-text)]'
             }`}
           >
             {tab.label}
@@ -108,60 +103,68 @@ export default function NewsView() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Market Sentiment & Hot Sectors */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Market Sentiment */}
-          <div className="bg-[#0F1620] border border-[#1A2A3A] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-[#E8F0F8] uppercase tracking-wider">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--app-text)]">
                 市场情绪指标
               </h3>
-              <span className={`text-xs font-mono px-2 py-1 rounded ${getSentimentColor()}`}>
-                {getSentimentText()}
+              <span
+                className={`rounded px-2 py-1 text-xs font-mono ${
+                  loading ? 'bg-[var(--app-soft)] text-[var(--app-muted)]' : `${sentimentColor} text-white`
+                }`}
+              >
+                {loading ? '分析中...' : sentimentLabel}
               </span>
             </div>
-            
-            <div className="w-full bg-[#1A2A3A] rounded-full h-2 mb-1">
-              <div
-                className={`h-2 rounded-full ${getSentimentColor()}`}
-                style={{ width: `${sentimentScore}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-xs font-mono text-[#5A7A9A]">
-              <span>极度悲观</span>
-              <span>中性</span>
-              <span>极度乐观</span>
-            </div>
+
+            {loading ? (
+              <LoadingState className="py-8 text-center text-xs font-mono text-[var(--app-muted)]" />
+            ) : (
+              <>
+                <div className="mb-1 h-2 w-full rounded-full bg-[var(--app-soft)]">
+                  <div
+                    className={`h-2 rounded-full ${sentimentColor}`}
+                    style={{ width: `${sentimentScore}%` }}
+                  />
+                </div>
+                <div className="flex justify-between font-mono text-xs text-[var(--app-muted)]">
+                  <span>极度悲观</span>
+                  <span>中性</span>
+                  <span>极度乐观</span>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Hot Sectors */}
-          <div className="bg-[#0F1620] border border-[#1A2A3A] rounded-xl p-4">
-            <h3 className="text-xs font-semibold text-[#E8F0F8] uppercase tracking-wider mb-3">
+          <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-sm">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--app-text)]">
               热门板块分析
             </h3>
-            
+
             <div className="space-y-2">
-              {HOT_SECTORS.map((sector, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-[#5A7A9A] w-4">{i + 1}</span>
+              {HOT_SECTORS.map((sector, index) => (
+                <div key={sector.name} className="flex items-center gap-2">
+                  <span className="w-4 font-mono text-xs text-[var(--app-muted)]">{index + 1}</span>
                   <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-mono text-[#E8F0F8]">{sector.name}</span>
-                      <span className={`text-xs font-mono font-semibold ${
-                        sector.trend === 'up' ? 'text-[#00FF88]' : 'text-[#FF4560]'
-                      }`}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="font-mono text-xs text-[var(--app-text)]">{sector.name}</span>
+                      <span
+                        className={`font-mono text-xs font-semibold ${
+                          sector.trend === 'up' ? 'text-[#16A34A]' : 'text-red-500'
+                        }`}
+                      >
                         {sector.change}
                       </span>
                     </div>
-                    <div className="w-full bg-[#1A2A3A] rounded-full h-1.5">
+                    <div className="h-1.5 w-full rounded-full bg-[var(--app-soft)]">
                       <div
                         className={`h-1.5 rounded-full ${
-                          sector.trend === 'up' ? 'bg-[#00FF88]' : 'bg-[#FF4560]'
+                          sector.trend === 'up' ? 'bg-[#16A34A]' : 'bg-red-500'
                         }`}
-                        style={{ 
-                          width: `${Math.abs(parseFloat(sector.change)) * 10}%`,
-                          maxWidth: '100%'
+                        style={{
+                          width: `${Math.min(Math.abs(parseFloat(sector.change)) * 10, 100)}%`,
                         }}
                       />
                     </div>
@@ -172,21 +175,23 @@ export default function NewsView() {
           </div>
         </div>
 
-        {/* AI Recommendations */}
         <div className="space-y-4">
-          <div className="bg-[#0F1620] border border-[#1A2A3A] rounded-xl p-4">
-            <h3 className="text-xs font-semibold text-[#E8F0F8] uppercase tracking-wider mb-3">
-              AI投资建议
+          <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-sm">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--app-text)]">
+              AI 投资建议
             </h3>
-            
+
             <div className="space-y-3">
-              {RECOMMENDATIONS.map((rec, i) => (
-                <div key={i} className="bg-[#080C10] rounded-lg p-3 border border-[#1A2A3A]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h4 className="text-xs font-semibold text-[#E8F0F8]">{rec.title}</h4>
-                  </div>
-                  <p className="text-xs font-mono text-[#5A7A9A] leading-snug">
-                    {rec.content}
+              {RECOMMENDATIONS.map((recommendation) => (
+                <div
+                  key={recommendation.title}
+                  className="rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] p-3"
+                >
+                  <h4 className="mb-2 text-xs font-semibold text-[var(--app-text)]">
+                    {recommendation.title}
+                  </h4>
+                  <p className="font-mono text-xs leading-snug text-[var(--app-muted)]">
+                    {recommendation.content}
                   </p>
                 </div>
               ))}
