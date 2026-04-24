@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Edit2, PieChart, Plus, Trash2, X } from "lucide-react";
-import { portfolioApi } from "@/lib/api";
+import { marketApi, portfolioApi } from "@/lib/api";
 import { CORE_STOCK_OPTIONS, findStockOption } from "@/constants/stocks";
 import { EmptyState, LoadingState } from "@/components/custom/async-state";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -31,6 +31,7 @@ export default function PortfolioView() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const latestQuoteRequestIdRef = useRef(0);
   const submitAction = useAsyncAction();
   const deleteAction = useAsyncAction();
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function PortfolioView() {
       setLoading(false);
     }
   };
-  const handleStockSelect = (symbol) => {
+  const handleStockSelect = async (symbol) => {
     const stock = findStockOption(symbol);
     if (!stock) {
       setForm((current) => ({
@@ -67,8 +68,30 @@ export default function PortfolioView() {
       ...current,
       symbol: stock.symbol,
       name: stock.name,
-      currentPrice: stock.price,
+      currentPrice: "",
     }));
+
+    const requestId = latestQuoteRequestIdRef.current + 1;
+    latestQuoteRequestIdRef.current = requestId;
+
+    try {
+      const response = await marketApi.getQuote(stock.code);
+      if (
+        requestId !== latestQuoteRequestIdRef.current ||
+        !response.success ||
+        !response.data?.price
+      ) {
+        return;
+      }
+
+      setForm((current) =>
+        current.symbol === stock.symbol
+          ? { ...current, currentPrice: response.data.price }
+          : current,
+      );
+    } catch {
+      // Keep the form editable even if the latest quote is unavailable.
+    }
   };
   const handleSubmit = async () => {
     if (!form.symbol || !form.shares || !form.costPrice) {
@@ -227,7 +250,7 @@ export default function PortfolioView() {
               </label>
               <select
                 value={form.symbol}
-                onChange={(event) => handleStockSelect(event.target.value)}
+                onChange={(event) => void handleStockSelect(event.target.value)}
                 className="w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-bg)] px-3 py-2 text-sm font-mono text-[var(--app-text)] outline-none transition-colors focus:border-[#16A34A]"
               >
                 <option value="">选择股票</option>

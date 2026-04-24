@@ -18,9 +18,7 @@ public class MarketService {
     }
 
     public List<Map<String, Object>> indices() {
-        return aliyunMarketApiService.fetchRankedStocks(6)
-                .map(rows -> rows.stream().limit(6).toList())
-                .orElseGet(marketMockService::indices);
+        return marketMockService.indices();
     }
 
     public Map<String, Object> quote(String code) {

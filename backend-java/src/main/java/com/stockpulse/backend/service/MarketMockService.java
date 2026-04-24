@@ -257,7 +257,23 @@ public class MarketMockService {
     private Map<String, Object> enrichSearchItem(Map<String, Object> item) {
         String code = String.valueOf(item.get("code"));
         return aliyunMarketApiService.fetchAshareSearchItem(code, item)
-                .orElse(item);
+                .map(this::markLiveSearchItem)
+                .orElseGet(() -> markFallbackSearchItem(item));
+    }
+
+    private Map<String, Object> markLiveSearchItem(Map<String, Object> item) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        copy.putAll(item);
+        copy.put("source", "live");
+        return copy;
+    }
+
+    private Map<String, Object> markFallbackSearchItem(Map<String, Object> item) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        copy.putAll(item);
+        copy.put("price", null);
+        copy.put("source", "fallback");
+        return copy;
     }
 
     private Map<String, Object> unknownSearchFallback(String query) {

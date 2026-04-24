@@ -38,6 +38,7 @@ function normalizeSearchResult(item) {
     symbol: item.symbol,
     name: item.name,
     price: item.price,
+    source: item.source ?? (item.price ? "live" : "fallback"),
   };
 }
 
@@ -55,6 +56,13 @@ function mergeSearchResults(primaryResults, fallbackResults) {
   }
 
   return mergedResults;
+}
+
+function createFallbackSearchResults(query) {
+  return filterStockOptions(query).map((item) => ({
+    ...item,
+    source: "fallback",
+  }));
 }
 
 function SearchBox({
@@ -114,9 +122,15 @@ function SearchBox({
                         {item.code} · {item.symbol}
                       </div>
                     </div>
-                    <div className="font-mono text-xs text-[var(--app-muted)]">
-                      {item.price}
-                    </div>
+                    {item.price ? (
+                      <div className="font-mono text-xs text-[var(--app-muted)]">
+                        {item.price}
+                      </div>
+                    ) : (
+                      <div className="rounded border border-[var(--app-border)] px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-[var(--app-muted)]">
+                        Local
+                      </div>
+                    )}
                   </button>
                 ))
               ) : (
@@ -160,7 +174,7 @@ export default function Index() {
       setSearchLoading(true);
       setSearchNotice("");
 
-      const fallbackResults = filterStockOptions(trimmedQuery);
+      const fallbackResults = createFallbackSearchResults(trimmedQuery);
 
       try {
         const response = await marketApi.searchStocks(trimmedQuery);
